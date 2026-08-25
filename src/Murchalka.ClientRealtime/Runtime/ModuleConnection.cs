@@ -10,7 +10,7 @@ using Murchalka.ClientRealtime.Realtime;
 
 namespace Murchalka.ClientRealtime.Runtime;
 
-internal sealed class ModuleConnection : IAsyncDisposable
+internal sealed class ModuleConnection : IModuleDependencyInvoker, IAsyncDisposable
 {
     private readonly Stream _stream;
     private readonly ModuleId _moduleId;

@@ -28,7 +28,7 @@ internal sealed class RealtimeServer : IAsyncDisposable
 
         var builder = WebApplication.CreateSlimBuilder();
         builder.WebHost.UseUrls(endpoint.ToString().TrimEnd('/'));
-        builder.Services.AddSingleton(_connection);
+        builder.Services.AddSingleton<IModuleDependencyInvoker>(_connection);
         builder.Services.AddSingleton<WebSocketConnectionHandler>();
         var application = builder.Build();
         application.UseWebSockets(new WebSocketOptions { KeepAliveInterval = TimeSpan.FromSeconds(30) });

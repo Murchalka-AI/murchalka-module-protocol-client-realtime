@@ -1,7 +1,7 @@
 <Project><PropertyGroup><ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally></PropertyGroup><ItemGroup>
-<PackageVersion Include="Murchalka.ModuleProtocol.Contracts" Version="0.2.0" />
-<PackageVersion Include="Murchalka.ModuleProtocol.Json" Version="0.2.0" />
-<PackageVersion Include="Murchalka.ModuleSdk.Testing" Version="0.2.0" />
+    <PackageVersion Include="Murchalka.ModuleProtocol.Contracts" Version="0.2.1" />
+    <PackageVersion Include="Murchalka.ModuleProtocol.Json" Version="0.2.1" />
+    <PackageVersion Include="Murchalka.ModuleSdk.Testing" Version="0.2.1" />
 <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.9.0" />
 <PackageVersion Include="xunit.v3" Version="4.0.0" />
 <PackageVersion Include="xunit.runner.visualstudio" Version="4.0.0" />
