@@ -1,0 +1,114 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+  packages: read
+  id-token: write
+  attestations: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.value }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - id: version
+        shell: bash
+        run: |
+          if [[ ! "${GITHUB_REF_NAME}" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$ ]]; then
+            echo "Tag must be canonical SemVer vX.Y.Z or vX.Y.Z-prerelease." >&2
+            exit 1
+          fi
+          echo "value=${GITHUB_REF_NAME#v}" >> "${GITHUB_OUTPUT}"
+  bundle:
+    needs: validate
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { rid: linux-x64, os: linux, arch: x64 }
+          - { rid: linux-arm64, os: linux, arch: arm64 }
+          - { rid: win-x64, os: windows, arch: x64 }
+          - { rid: win-arm64, os: windows, arch: arm64 }
+          - { rid: osx-x64, os: macos, arch: x64 }
+          - { rid: osx-arm64, os: macos, arch: arm64 }
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+          cache: true
+          cache-dependency-path: |
+            Directory.Packages.props
+            **/*.csproj
+      - name: Authenticate to GitHub Packages
+        shell: bash
+        env:
+          PACKAGE_TOKEN: ${{ github.token }}
+        run: dotnet nuget update source murchalka --username "${GITHUB_ACTOR}" --password "${PACKAGE_TOKEN}" --store-password-in-clear-text --configfile NuGet.Config
+      - run: dotnet restore Murchalka.ClientRealtime.slnx --configfile NuGet.Config
+      - run: dotnet format Murchalka.ClientRealtime.slnx --verify-no-changes --no-restore
+      - run: dotnet build Murchalka.ClientRealtime.slnx --configuration Release --no-restore -p:Version=${{ needs.validate.outputs.version }}
+      - name: Test and conformance
+        run: dotnet run --project tests/Murchalka.ClientRealtime.Tests/Murchalka.ClientRealtime.Tests.csproj --configuration Release --no-build --no-restore -- -reporter quiet
+      - name: Publish target
+        run: dotnet publish src/Murchalka.ClientRealtime/Murchalka.ClientRealtime.csproj --configuration Release --runtime ${{ matrix.rid }} --self-contained false --no-restore --output artifacts/publish/${{ matrix.rid }} -p:Version=${{ needs.validate.outputs.version }}
+      - name: Sign bundle
+        shell: bash
+        env:
+          SIGNING_KEY_PEM: ${{ secrets.MURCHALKA_BUNDLE_SIGNING_KEY_PEM }}
+          SIGNING_KEY_ID: ${{ secrets.MURCHALKA_BUNDLE_SIGNING_KEY_ID }}
+        run: |
+          test -n "${SIGNING_KEY_PEM}" && test -n "${SIGNING_KEY_ID}"
+          key="${RUNNER_TEMP}/bundle-key.pem"
+          umask 077
+          printf '%s\n' "${SIGNING_KEY_PEM}" > "${key}"
+          executable="Murchalka.ClientRealtime"
+          if [[ "${{ matrix.os }}" == "windows" ]]; then executable="${executable}.exe"; fi
+          mkdir -p artifacts/release
+          bash packaging/package.sh . artifacts/publish/${{ matrix.rid }} "${key}" "${SIGNING_KEY_ID}" "${{ needs.validate.outputs.version }}" "${{ matrix.os }}" "${{ matrix.arch }}" "${GITHUB_SHA}" "${executable}" "artifacts/release/client-realtime-${{ needs.validate.outputs.version }}-${{ matrix.rid }}.murchalka"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: client-realtime-${{ matrix.rid }}
+          path: artifacts/release/*.murchalka
+          if-no-files-found: error
+  publish:
+    needs: [validate, bundle]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: client-realtime-*
+          merge-multiple: true
+          path: artifacts/release
+      - name: Checksums
+        run: (cd artifacts/release && sha256sum *.murchalka > SHA256SUMS)
+      - uses: actions/attest-build-provenance@v3
+        with:
+          subject-path: artifacts/release/*.murchalka
+      - name: Publish immutable GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "${GITHUB_REF_NAME}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
+            echo "Release already exists and remains immutable." >&2
+            exit 1
+          fi
+          gh release create "${GITHUB_REF_NAME}" artifacts/release/* --repo "${GITHUB_REPOSITORY}" --verify-tag --generate-notes --title "${GITHUB_REF_NAME}"
+

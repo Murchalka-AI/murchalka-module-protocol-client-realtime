@@ -1,0 +1,76 @@
+apiVersion: modules.murchalka.dev/v1
+kind: Module
+metadata:
+  id: dev.murchalka.client-realtime
+  name: Murchalka Client Realtime Protocol
+  version: 0.1.0
+  publisher: dev.murchalka
+  description: Authenticated loopback WebSocket protocol for universal clients.
+  license: Apache-2.0
+compatibility:
+  moduleSdk: ">=0.2.0 <0.3.0"
+  runtime: ">=0.1.0 <0.3.0"
+  moduleProtocol: "1"
+artifacts:
+  runtime:
+    - id: client-realtime-process
+      mode: process
+      os: [linux, windows, macos]
+      architectures: [x64, arm64]
+      entrypoint: runtime/process/Murchalka.ClientRealtime
+      digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+      protocolVersion: 1
+provides:
+  capabilities:
+    - id: client.realtime.status
+      category: client.realtime
+      version: 1.0.0
+      contract: schemas/capabilities/client.realtime.status.json
+      cardinality: manyConsumers
+      scope: [global]
+      execution: { kind: requestResponse, idempotency: readOnly, timeout: 5s }
+requires:
+  capabilities:
+    - requirementId: authentication
+      capability: auth.local
+      version: ">=1.0.0 <2.0.0"
+      cardinality: exactlyOne
+      selection: automatic
+      scope: global
+    - requirementId: agent
+      capability: agent.turn
+      version: ">=1.0.0 <2.0.0"
+      cardinality: exactlyOne
+      selection: automatic
+      scope: session
+    - requirementId: agent-ui
+      capability: agent-ui.document
+      version: ">=1.0.0 <2.0.0"
+      cardinality: exactlyOne
+      selection: automatic
+      scope: session
+configuration:
+  schema: schemas/configuration.schema.json
+  defaults: configuration/defaults.json
+  restartPolicy: restartModule
+permissions:
+  capabilities:
+    invoke: [auth.local, agent.turn, agent-ui.document]
+health:
+  startupTimeout: 15s
+  readiness: { interval: 2s, timeout: 2s, failureThreshold: 3 }
+  liveness: { interval: 30s, timeout: 2s, failureThreshold: 3 }
+activation:
+  mode: automaticWhenTrusted
+  failurePolicy: rollback
+  hotReload: false
+  drainTimeout: 30s
+upgrade:
+  strategy: sideBySide
+  rollbackWindow: 7d
+  stateMigration: none
+extensions:
+  dev.murchalka.client-realtime:
+    loopbackListener: true
+    websocketProtocol: murchalka.realtime.v1
+

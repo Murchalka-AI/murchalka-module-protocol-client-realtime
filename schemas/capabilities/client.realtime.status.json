@@ -1,0 +1,10 @@
+{
+  "apiVersion": "capabilities.murchalka.dev/v1",
+  "kind": "CapabilityContract",
+  "metadata": { "id": "client.realtime.status", "version": "1.0.0", "category": "client.realtime", "description": "Discovers the active authenticated loopback realtime endpoint." },
+  "request": { "schema": "client.realtime.status.request.schema.json" },
+  "response": { "schema": "client.realtime.status.response.schema.json" },
+  "semantics": { "interaction": "requestResponse", "sideEffect": "none", "idempotency": "readOnly", "streaming": false, "cancellation": "required", "defaultTimeout": "5s", "maxPayloadBytes": 4096 },
+  "security": { "inputDataClasses": ["internal"], "outputDataClasses": ["internal"], "requiredPurpose": "client-discovery" },
+  "errors": [{ "code": "module-inactive", "retryable": true, "description": "The realtime listener is not active." }]
+}
