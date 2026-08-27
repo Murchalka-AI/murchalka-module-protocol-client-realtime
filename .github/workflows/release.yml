@@ -67,6 +67,8 @@ jobs:
       - run: dotnet build Murchalka.ClientRealtime.slnx --configuration Release --no-restore -p:Version=${{ needs.validate.outputs.version }}
       - name: Test and conformance
         run: dotnet run --project tests/Murchalka.ClientRealtime.Tests/Murchalka.ClientRealtime.Tests.csproj --configuration Release --no-build --no-restore -- -reporter quiet
+      - name: Restore target runtime
+        run: dotnet restore src/Murchalka.ClientRealtime/Murchalka.ClientRealtime.csproj --runtime ${{ matrix.rid }} --configfile NuGet.Config
       - name: Publish target
         run: dotnet publish src/Murchalka.ClientRealtime/Murchalka.ClientRealtime.csproj --configuration Release --runtime ${{ matrix.rid }} --self-contained false --no-restore --output artifacts/publish/${{ matrix.rid }} -p:Version=${{ needs.validate.outputs.version }}
       - name: Sign bundle
@@ -106,9 +108,13 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if gh release view "${GITHUB_REF_NAME}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
-            echo "Release already exists and remains immutable." >&2
+          is_draft="$(gh release view "${GITHUB_REF_NAME}" --repo "${GITHUB_REPOSITORY}" --json isDraft --jq .isDraft 2>/dev/null || true)"
+          if [[ "${is_draft}" == "false" ]]; then
+            echo "Published release already exists and remains immutable." >&2
             exit 1
           fi
-          gh release create "${GITHUB_REF_NAME}" artifacts/release/* --repo "${GITHUB_REPOSITORY}" --verify-tag --generate-notes --title "${GITHUB_REF_NAME}"
-
+          if [[ -z "${is_draft}" ]]; then
+            gh release create "${GITHUB_REF_NAME}" --repo "${GITHUB_REPOSITORY}" --draft --verify-tag --generate-notes --title "${GITHUB_REF_NAME}"
+          fi
+          gh release upload "${GITHUB_REF_NAME}" artifacts/release/* --repo "${GITHUB_REPOSITORY}" --clobber
+          gh release edit "${GITHUB_REF_NAME}" --repo "${GITHUB_REPOSITORY}" --draft=false

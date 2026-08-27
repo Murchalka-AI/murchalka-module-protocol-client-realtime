@@ -3,13 +3,13 @@ kind: Module
 metadata:
   id: dev.murchalka.client-realtime
   name: Murchalka Client Realtime Protocol
-  version: 0.2.1
+  version: 0.3.3
   publisher: dev.murchalka
   description: Authenticated loopback WebSocket protocol for universal clients.
   license: Apache-2.0
 compatibility:
-  moduleSdk: ">=0.2.0 <0.2.99"
-  runtime: ">=0.1.0 <0.2.99"
+  moduleSdk: ">=0.3.0 <0.4.0"
+  runtime: ">=0.3.0 <0.4.0"
   moduleProtocol: "1"
 artifacts:
   runtime:
