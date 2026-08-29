@@ -3,13 +3,13 @@ kind: Module
 metadata:
   id: dev.murchalka.client-realtime
   name: Murchalka Client Realtime Protocol
-  version: 0.3.3
+  version: 0.4.0
   publisher: dev.murchalka
   description: Authenticated loopback WebSocket protocol for universal clients.
   license: Apache-2.0
 compatibility:
-  moduleSdk: ">=0.3.0 <0.4.0"
-  runtime: ">=0.3.0 <0.4.0"
+  moduleSdk: ">=0.3.0 <0.5.0"
+  runtime: ">=0.4.0 <0.5.0"
   moduleProtocol: "1"
 artifacts:
   runtime:
@@ -55,13 +55,21 @@ requires:
       cardinality: exactlyOne
       selection: automatic
       scope: session
+optional:
+  capabilities:
+    - requirementId: client-actions
+      category: client.action-handler
+      version: ">=1.0.0 <2.0.0"
+      cardinality: zeroOrMany
+      selection: automatic
+      fallback: reject-unavailable-action
 configuration:
   schema: schemas/configuration.schema.json
   defaults: configuration/defaults.json
   restartPolicy: restartModule
 permissions:
   capabilities:
-    invoke: [auth.local, sessions.manage, agent.turn, agent-ui.document]
+    invoke: [auth.local, sessions.manage, agent.turn, agent-ui.document, { category: client.action-handler }]
 health:
   startupTimeout: 15s
   readiness: { interval: 2s, timeout: 2s, failureThreshold: 3 }

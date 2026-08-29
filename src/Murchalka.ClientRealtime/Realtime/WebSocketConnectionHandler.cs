@@ -67,13 +67,14 @@ internal sealed class WebSocketConnectionHandler
                         {
                             "turn" => await TurnAsync(session, request, cancellationToken).ConfigureAwait(false),
                             "ui.get" => await GetUiAsync(session, request, cancellationToken).ConfigureAwait(false),
+                            "action.dispatch" => await DispatchActionAsync(session, request, cancellationToken).ConfigureAwait(false),
                             _ => throw new InvalidDataException("Unknown realtime message type.")
                         };
                     }
 
                     await SendAsync(socket, response, cancellationToken).ConfigureAwait(false);
                 }
-                catch (Exception exception) when (exception is InvalidDataException or UnauthorizedAccessException or ModuleDependencyException)
+                catch (Exception exception) when (exception is InvalidDataException or ArgumentException or UnauthorizedAccessException or ModuleDependencyException)
                 {
                     var code = exception is ModuleDependencyException dependency ? dependency.Code : exception is UnauthorizedAccessException ? "authentication-required" : "request-invalid";
                     await SendAsync(socket, JsonSerializer.SerializeToElement(new { type = "error", code, message = exception.Message }), cancellationToken).ConfigureAwait(false);
@@ -124,6 +125,29 @@ internal sealed class WebSocketConnectionHandler
             _timeProvider.GetUtcNow().AddSeconds(10),
             cancellationToken).ConfigureAwait(false);
         return JsonSerializer.SerializeToElement(new { type = "ui.document", document = result });
+    }
+
+    private async ValueTask<JsonElement> DispatchActionAsync(AuthenticatedSession session, JsonElement request, CancellationToken cancellationToken)
+    {
+        var extensionId = RealtimeRequestValidator.RequiredString(request, "extensionId", 160);
+        var actionId = RealtimeRequestValidator.RequiredString(request, "actionId", 160);
+        var handlerModule = new ModuleId(RealtimeRequestValidator.RequiredString(request, "handlerModule", 253));
+        var idempotencyKey = RealtimeRequestValidator.RequiredString(request, "idempotencyKey", 256);
+        if (!request.TryGetProperty("payload", out var payload)) throw new InvalidDataException("Property 'payload' is required.");
+        var payloadBytes = JsonSerializer.SerializeToUtf8Bytes(payload);
+        if (payloadBytes.Length > MaximumMessageBytes) throw new InvalidDataException("Action payload exceeds the realtime message limit.");
+        var result = await _dependencies.InvokeSelectedDependencyAsync(
+            "client-actions",
+            handlerModule,
+            session.Subject,
+            new InvocationScope(null, null, session.PersonId, null, null, null),
+            "client-extension-action",
+            JsonSerializer.SerializeToElement(new { extensionId, actionId, payload }),
+            "client.action.request@1",
+            idempotencyKey,
+            _timeProvider.GetUtcNow().AddSeconds(30),
+            cancellationToken).ConfigureAwait(false);
+        return JsonSerializer.SerializeToElement(new { type = "action.completed", result });
     }
 
     private async ValueTask<string> EnsureSessionAsync(AuthenticatedSession session, string conversationId, CancellationToken cancellationToken)

@@ -15,4 +15,16 @@ internal interface IModuleDependencyInvoker
         string? idempotencyKey,
         DateTimeOffset deadline,
         CancellationToken cancellationToken);
+
+    ValueTask<JsonElement> InvokeSelectedDependencyAsync(
+        string requirementId,
+        ModuleId providerModule,
+        string? actorReference,
+        InvocationScope scope,
+        string purpose,
+        JsonElement payload,
+        string payloadSchema,
+        string? idempotencyKey,
+        DateTimeOffset deadline,
+        CancellationToken cancellationToken);
 }

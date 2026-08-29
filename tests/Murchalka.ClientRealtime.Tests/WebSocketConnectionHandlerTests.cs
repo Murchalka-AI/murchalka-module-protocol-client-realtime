@@ -29,4 +29,29 @@ public sealed class WebSocketConnectionHandlerTests
         Assert.Equal("turn.completed", socket.Sent[1].GetProperty("type").GetString());
         Assert.Equal(openedSession, socket.Sent[1].GetProperty("sessionId").GetString());
     }
+
+    /// <summary>Verifies a client action is routed only to a granted server-side handler.</summary>
+    [Fact]
+    public async Task ClientActionUsesSelectedServerHandler()
+    {
+        var dependencies = new RecordingDependencyInvoker();
+        var socket = new ScriptedWebSocket();
+        socket.QueueText(new { type = "authenticate", username = "owner", password = "VeryStrong123" });
+        socket.QueueText(new
+        {
+            type = "action.dispatch",
+            extensionId = "client.diagnostics",
+            actionId = "client.diagnostics.run",
+            handlerModule = "dev.murchalka.client-diagnostics",
+            idempotencyKey = "action-test",
+            payload = new { message = "hello" }
+        });
+        socket.QueueClose();
+        var handler = new WebSocketConnectionHandler(dependencies, TimeProvider.System);
+
+        await handler.RunAsync(socket, TestContext.Current.CancellationToken);
+
+        Assert.Equal("client-actions", dependencies.Calls[1].RequirementId);
+        Assert.Equal("action.completed", socket.Sent[1].GetProperty("type").GetString());
+    }
 }

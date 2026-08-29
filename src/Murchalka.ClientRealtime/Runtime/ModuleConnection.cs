@@ -153,6 +153,39 @@ internal sealed class ModuleConnection : IModuleDependencyInvoker, IAsyncDisposa
 
         var endpoint = _dependencies.Endpoints.SingleOrDefault(value => value.RequirementId == requirementId)
             ?? throw new ModuleDependencyException("dependency-not-granted", $"Dependency '{requirementId}' is not granted.");
+        return await InvokeEndpointAsync(endpoint, actorReference, scope, purpose, payload, payloadSchema, idempotencyKey, deadline, cancellationToken).ConfigureAwait(false);
+    }
+
+    public async ValueTask<JsonElement> InvokeSelectedDependencyAsync(
+        string requirementId,
+        ModuleId providerModule,
+        string? actorReference,
+        InvocationScope scope,
+        string purpose,
+        JsonElement payload,
+        string payloadSchema,
+        string? idempotencyKey,
+        DateTimeOffset deadline,
+        CancellationToken cancellationToken)
+    {
+        if (!_active) throw new ModuleDependencyException("module-inactive", "Realtime module is not active.");
+        var endpoint = _dependencies.Endpoints.SingleOrDefault(value =>
+            value.RequirementId == requirementId && value.ProviderModule == providerModule)
+            ?? throw new ModuleDependencyException("action-handler-not-granted", $"Action handler module '{providerModule.Value}' is not granted.");
+        return await InvokeEndpointAsync(endpoint, actorReference, scope, purpose, payload, payloadSchema, idempotencyKey, deadline, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async ValueTask<JsonElement> InvokeEndpointAsync(
+        DependencyEndpoint endpoint,
+        string? actorReference,
+        InvocationScope scope,
+        string purpose,
+        JsonElement payload,
+        string payloadSchema,
+        string? idempotencyKey,
+        DateTimeOffset deadline,
+        CancellationToken cancellationToken)
+    {
         var invocation = new InvocationEnvelope(
             Guid.NewGuid(),
             endpoint.Capability,

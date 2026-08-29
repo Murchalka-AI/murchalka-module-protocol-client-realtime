@@ -45,6 +45,23 @@ internal sealed class RecordingDependencyInvoker : IModuleDependencyInvoker
         });
     }
 
+    public ValueTask<JsonElement> InvokeSelectedDependencyAsync(
+        string requirementId,
+        ModuleId providerModule,
+        string? actorReference,
+        InvocationScope scope,
+        string purpose,
+        JsonElement payload,
+        string payloadSchema,
+        string? idempotencyKey,
+        DateTimeOffset deadline,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        Calls.Add(new DependencyCall(requirementId, scope, idempotencyKey));
+        return ValueTask.FromResult(JsonSerializer.SerializeToElement(new { accepted = true, provider = providerModule.Value }));
+    }
+
     private static JsonElement Session(JsonElement payload)
     {
         var sessionId = payload.GetProperty("sessionId").GetString();
